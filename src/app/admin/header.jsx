@@ -10,28 +10,8 @@ export default function Header({ isOpen, onClickHeader }) {
   const [bearer, setBearer] = useState(null);
   const router = useRouter();
 
-  // cek token
-  //   useEffect(() => {
-  //     const savedToken = localStorage.getItem("token");
-  //     setBearer(savedToken);
-  //     if (savedToken) {
-  //       const decoded = jwtDecode(savedToken);
-  //       // const user_id = decoded.id;
-  //       const expirationTime = new Date(decoded.exp * 1000);
-  //       const currentTime = new Date();
-
-  //       if (currentTime > expirationTime) {
-  //         localStorage.removeItem("token");
-  //         router.push(`/login`);
-  //       }
-  //     }
-  //     if (!savedToken) {
-  //       router.push(`/login`);
-  //     }
-  //   }, []);
-
   const handleLogout = () => {
-    localStorage.removeItem("token");
+    localStorage.clear();
     router.push("/login");
   };
   return (

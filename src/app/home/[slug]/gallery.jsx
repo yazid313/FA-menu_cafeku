@@ -65,7 +65,7 @@ export default function Gallery({ gallery }) {
 
           <button
             onClick={prevImage}
-            className="absolute left-6 text-red-500 text-5xl font-bold hover:scale-110"
+            className="absolute left-6 text-white text-5xl font-bold hover:scale-110"
           >
             &lt;
           </button>

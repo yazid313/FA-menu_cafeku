@@ -5,6 +5,7 @@ import axios from "axios";
 import { jwtDecode } from "jwt-decode";
 import { useRouter } from "next/navigation";
 import EditDataSkeleton from "../../adminSkeleton/editDataSkeleton";
+import { getNewAccessToken } from "../../refreshToken";
 
 export default function Addevents({ params }) {
   const [events, setEvents] = useState({
@@ -21,7 +22,7 @@ export default function Addevents({ params }) {
 
   // cek token
   useEffect(() => {
-    const savedToken = localStorage.getItem("token");
+    const savedToken = localStorage.getItem("refreshToken");
 
     if (savedToken) {
       const decoded = jwtDecode(savedToken);
@@ -30,7 +31,7 @@ export default function Addevents({ params }) {
       const currentTime = new Date();
 
       if (currentTime > expirationTime) {
-        localStorage.removeItem("token");
+        localStorage.clear();
         router.push(`/login`);
       } else {
         axios
@@ -77,6 +78,7 @@ export default function Addevents({ params }) {
     fetchData();
   }, []);
 
+  //handle edit dan create
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!events.title || !events.description) {
@@ -94,6 +96,22 @@ export default function Addevents({ params }) {
     } else if (events.photo) {
       formData.append("photo", events.photo);
     }
+    const handleError = async (error) => {
+      if (error.response?.status === 401) {
+        try {
+          const newToken = await getNewAccessToken();
+          localStorage.setItem("token", newToken); // Simpan token baru
+          await handleSubmit(e); // Ulangi proses dengan token baru
+        } catch (err) {
+          console.error("Failed to refresh token:", err);
+          alert("Session Anda telah berakhir. Silakan login ulang.");
+          localStorage.clear();
+          router.push("/login");
+        }
+      } else {
+        console.error("Error deleting contact:", error);
+      }
+    };
 
     try {
       const token = localStorage.getItem("token");
@@ -121,8 +139,7 @@ export default function Addevents({ params }) {
       router.push("/admin/event");
       setLoadingButton(false);
     } catch (error) {
-      console.error("Error submitting data:", error);
-      alert("Terjadi kesalahan, silakan coba lagi.");
+      await handleError(error);
     }
   };
 

@@ -5,6 +5,7 @@ import axios from "axios";
 import { jwtDecode } from "jwt-decode";
 import { useRouter } from "next/navigation";
 import EditDataSkeleton from "../../adminSkeleton/editDataSkeleton";
+import { getNewAccessToken } from "../../refreshToken";
 
 export default function Addkategory({ params }) {
   const [kategory, setKategory] = useState({
@@ -20,7 +21,7 @@ export default function Addkategory({ params }) {
 
   // cek token
   useEffect(() => {
-    const savedToken = localStorage.getItem("token");
+    const savedToken = localStorage.getItem("refreshToken");
 
     if (savedToken) {
       const decoded = jwtDecode(savedToken);
@@ -29,7 +30,7 @@ export default function Addkategory({ params }) {
       const currentTime = new Date();
 
       if (currentTime > expirationTime) {
-        localStorage.removeItem("token");
+        localStorage.clear();
         router.push(`/login`);
       } else {
         axios
@@ -76,6 +77,7 @@ export default function Addkategory({ params }) {
     fetchData();
   }, []);
 
+  //handle edit dan create
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!kategory.type) {
@@ -92,6 +94,22 @@ export default function Addkategory({ params }) {
     } else if (kategory.photo) {
       formData.append("photo", kategory.photo);
     }
+    const handleError = async (error) => {
+      if (error.response?.status === 401) {
+        try {
+          const newToken = await getNewAccessToken();
+          localStorage.setItem("token", newToken); // Simpan token baru
+          await handleSubmit(e); // Ulangi proses dengan token baru
+        } catch (err) {
+          console.error("Failed to refresh token:", err);
+          alert("Session Anda telah berakhir. Silakan login ulang.");
+          localStorage.clear();
+          router.push("/login");
+        }
+      } else {
+        console.error("Error deleting contact:", error);
+      }
+    };
 
     try {
       const token = localStorage.getItem("token");
@@ -119,8 +137,7 @@ export default function Addkategory({ params }) {
       router.push("/admin/kategory");
       setLoadingButton(false);
     } catch (error) {
-      console.error("Error submitting data:", error);
-      alert("Terjadi kesalahan, silakan coba lagi.");
+      await handleError(error);
     }
   };
 

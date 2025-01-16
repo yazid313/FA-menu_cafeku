@@ -70,11 +70,11 @@ export default function Home({ params }) {
   console.log(category);
 
   return (
-    <div className="container">
+    <div className="container bg-gradient-to-br  from-white to-yellow-100">
       <Header category={category} />
       <div id="menu" className="pt-[40px]">
         <div className="mt-[20px]">
-          <div className="bg-gray-100 py-6">
+          <div className=" py-6">
             <h4 className="text-center text-sm text-yellow-700">Assortments</h4>
             <h2 className="text-center font-bold text-2xl md:text-4xl">
               MENU BOOK
@@ -90,7 +90,7 @@ export default function Home({ params }) {
             <>
               {category.map((item) => {
                 return (
-                  <div id={item.type} key={item.id} className="px-4 py-8">
+                  <div id={item.type} key={item.id} className="px-4 py-8 ">
                     <div className=" w-full rounded-lg">
                       <h1 className="font-bold capitalize text-center text-2xl md:text-4xl text-black">
                         {item.type}

@@ -5,6 +5,7 @@ import axios from "axios";
 import { jwtDecode } from "jwt-decode";
 import { useRouter } from "next/navigation";
 import EditDataSkeleton from "../../adminSkeleton/editDataSkeleton";
+import { getNewAccessToken } from "../../refreshToken";
 
 export default function AddMenu({ params }) {
   const [menu, setMenu] = useState({
@@ -25,7 +26,7 @@ export default function AddMenu({ params }) {
 
   // cek token
   useEffect(() => {
-    const savedToken = localStorage.getItem("token");
+    const savedToken = localStorage.getItem("refreshToken");
 
     if (savedToken) {
       const decoded = jwtDecode(savedToken);
@@ -34,7 +35,7 @@ export default function AddMenu({ params }) {
       const currentTime = new Date();
 
       if (currentTime > expirationTime) {
-        localStorage.removeItem("token");
+        localStorage.clear();
         router.push(`/login`);
       } else {
         axios
@@ -131,6 +132,23 @@ export default function AddMenu({ params }) {
       formData.append("photo", menu.photo);
     }
 
+    const handleError = async (error) => {
+      if (error.response?.status === 401) {
+        try {
+          const newToken = await getNewAccessToken();
+          localStorage.setItem("token", newToken); // Simpan token baru
+          await handleSubmit(e); // Ulangi proses dengan token baru
+        } catch (err) {
+          console.error("Failed to refresh token:", err);
+          alert("Session Anda telah berakhir. Silakan login ulang.");
+          localStorage.clear();
+          router.push("/login");
+        }
+      } else {
+        console.error("Error deleting contact:", error);
+      }
+    };
+
     try {
       const token = localStorage.getItem("token");
       const headers = { Authorization: `Bearer ${token}` };
@@ -157,8 +175,7 @@ export default function AddMenu({ params }) {
       router.push("/admin/menu");
       setLoadingButton(false);
     } catch (error) {
-      console.error("Error submitting data:", error);
-      alert("Terjadi kesalahan, silakan coba lagi.");
+      await handleError(error);
     }
   };
 

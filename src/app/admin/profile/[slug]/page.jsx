@@ -5,6 +5,7 @@ import axios from "axios";
 import { jwtDecode } from "jwt-decode";
 import { useRouter } from "next/navigation";
 import EditDataSkeleton from "../../adminSkeleton/editDataSkeleton";
+import { getNewAccessToken } from "../../refreshToken";
 
 export default function AddProfile({ params }) {
   const [profile, setProfile] = useState({
@@ -22,16 +23,17 @@ export default function AddProfile({ params }) {
 
   // cek token
   useEffect(() => {
-    const savedToken = localStorage.getItem("token");
+    const savedToken = localStorage.getItem("refreshToken");
 
     if (savedToken) {
       const decoded = jwtDecode(savedToken);
       const outlet_id = decoded.id;
       const expirationTime = new Date(decoded.exp * 1000);
       const currentTime = new Date();
+      console.log(decoded, "popopo");
 
       if (currentTime > expirationTime) {
-        localStorage.removeItem("token");
+        localStorage.clear();
         router.push(`/login`);
       } else {
         axios
@@ -107,8 +109,31 @@ export default function AddProfile({ params }) {
       router.push("/admin");
       setLoadingButton(false);
     } catch (error) {
-      console.error("Error submitting data:", error);
-      alert("Terjadi kesalahan, silakan coba lagi.");
+      if (error.response.status === 401) {
+        try {
+          const token = await getNewAccessToken();
+          const headersWithNewToken = { Authorization: `Bearer ${token}` };
+
+          setLoadingButton(true);
+
+          await axios.put(
+            `${process.env.NEXT_PUBLIC_BASE_API_URL}/api/v1/profile/update/${profile.id}`,
+            formData,
+            { headers: headersWithNewToken }
+          );
+          alert("Data berhasil diperbaruiiiiii!");
+          localStorage.removeItem("id_profile");
+          router.push("/admin");
+          setLoadingButton(false);
+        } catch (error) {
+          console.error("Gagal memperbarui token:", error);
+          alert("Session Anda telah berakhir. Silakan login ulang.");
+          localStorage.clear();
+          router.push("/login");
+        }
+      } else {
+        console.log(error);
+      }
     }
   };
 

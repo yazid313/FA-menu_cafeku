@@ -29,7 +29,7 @@ export default function Profile() {
       const currentTime = new Date();
 
       if (currentTime > expirationTime) {
-        localStorage.removeItem("refreshToken");
+        localStorage.clear();
         router.push(`/login`);
       } else {
         axios
@@ -59,12 +59,6 @@ export default function Profile() {
           // Mengambil data transaksi menggunakan axios dengan query params
           const response = await axios.get(
             ` ${process.env.NEXT_PUBLIC_BASE_API_URL}/api/v1/profile/showcafename/${outletName}`
-            // {
-            //   headers: {
-            //     Authorization: `Bearer ${savedToken}`,
-            //   },
-            //   params: params,
-            // }
           );
 
           const data = response.data;

@@ -5,6 +5,7 @@ import axios from "axios";
 import { jwtDecode } from "jwt-decode";
 import { useRouter } from "next/navigation";
 import EditDataSkeleton from "../../adminSkeleton/editDataSkeleton";
+import { getNewAccessToken } from "../../refreshToken";
 
 export default function AddGallery({ params }) {
   const [gallery, setGallery] = useState({
@@ -14,13 +15,12 @@ export default function AddGallery({ params }) {
   const [selectedFile, setSelectedFile] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
   const [loadingButton, setLoadingButton] = useState(false);
-  const [idOutlet, setIdOutlet] = useState([]);
   const router = useRouter();
   const { slug } = React.use(params);
 
   // cek token
   useEffect(() => {
-    const savedToken = localStorage.getItem("token");
+    const savedToken = localStorage.getItem("refreshToken");
 
     if (savedToken) {
       const decoded = jwtDecode(savedToken);
@@ -29,7 +29,7 @@ export default function AddGallery({ params }) {
       const currentTime = new Date();
 
       if (currentTime > expirationTime) {
-        localStorage.removeItem("token");
+        localStorage.clear();
         router.push(`/login`);
       } else {
         axios
@@ -76,6 +76,7 @@ export default function AddGallery({ params }) {
     fetchData();
   }, []);
 
+  //handle edit dan create
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!gallery.title) {
@@ -92,6 +93,22 @@ export default function AddGallery({ params }) {
     } else if (gallery.image) {
       formData.append("image", gallery.image);
     }
+    const handleError = async (error) => {
+      if (error.response?.status === 401) {
+        try {
+          const newToken = await getNewAccessToken();
+          localStorage.setItem("token", newToken); // Simpan token baru
+          await handleSubmit(e); // Ulangi proses dengan token baru
+        } catch (err) {
+          console.error("Failed to refresh token:", err);
+          alert("Session Anda telah berakhir. Silakan login ulang.");
+          localStorage.clear();
+          router.push("/login");
+        }
+      } else {
+        console.error("Error deleting contact:", error);
+      }
+    };
 
     try {
       const token = localStorage.getItem("token");
@@ -119,8 +136,7 @@ export default function AddGallery({ params }) {
       router.push("/admin/gallery");
       setLoadingButton(false);
     } catch (error) {
-      console.error("Error submitting data:", error);
-      alert("Terjadi kesalahan, silakan coba lagi.");
+      await handleError(error);
     }
   };
 

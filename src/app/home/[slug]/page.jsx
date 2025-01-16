@@ -4,11 +4,12 @@ import React, { useState, useEffect } from "react";
 import About from "./about";
 import Contact from "./contact";
 import Gallery from "./gallery";
-import Slider from "./slider";
+
 import axios from "axios";
 import Link from "next/link";
 import Navbar from "./navbar";
 import { HomeSkeleton } from "./homeSkeleton";
+import Slider from "./slider";
 
 // import Link from "next/link";
 
@@ -62,7 +63,7 @@ export default function Home({ params }) {
   return (
     <div>
       <Navbar profile={profile} />
-      <div className="pt-[40px] container p-0">
+      <div className="pt-[40px] container p-0 bg-gradient-to-br  from-white to-yellow-100">
         <Slider events={event} />
         <div className="px-[20px] md:px-[50px] lg:px-[100px]">
           <div className=" py-6">

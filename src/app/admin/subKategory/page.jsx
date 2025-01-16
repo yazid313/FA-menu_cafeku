@@ -7,6 +7,7 @@ import { jwtDecode } from "jwt-decode";
 import { useRouter } from "next/navigation";
 import Modal from "../modal";
 import AdminSkeleton from "../adminSkeleton/adminSkeleton";
+import { getNewAccessToken } from "../refreshToken";
 // import AdminSkeleton from "../adminSkeleton/adminSkeleton";
 
 export default function subCategory() {
@@ -20,7 +21,7 @@ export default function subCategory() {
 
   // cek token
   useEffect(() => {
-    const savedToken = localStorage.getItem("token");
+    const savedToken = localStorage.getItem("refreshToken");
 
     if (savedToken) {
       const decoded = jwtDecode(savedToken);
@@ -29,7 +30,7 @@ export default function subCategory() {
       const currentTime = new Date();
 
       if (currentTime > expirationTime) {
-        localStorage.removeItem("token");
+        localStorage.clear();
         router.push(`/login`);
       } else {
         axios
@@ -50,29 +51,38 @@ export default function subCategory() {
     }
   }, [router]);
 
-  //mengambil data subCategory
+  //function mengambil data subCategory
+  const fetchData = async () => {
+    try {
+      // Mengambil data transaksi menggunakan axios dengan query params
+      const response = await axios.get(
+        ` ${process.env.NEXT_PUBLIC_BASE_API_URL}/api/v1/subcategory/showcafename/${outletName}`
+      );
+
+      const data = response.data;
+
+      setSubCategory(data);
+    } catch (error) {
+      console.error("Error fetching transaction data:", error);
+    }
+  };
+
+  //useEffect mengambil data subCategory
   useEffect(() => {
-    setIsLoading(true);
-    const fetchData = async () => {
-      if (outletName) {
-        try {
-          // Mengambil data transaksi menggunakan axios dengan query params
-          const response = await axios.get(
-            ` ${process.env.NEXT_PUBLIC_BASE_API_URL}/api/v1/subcategory/showcafename/${outletName}`
-          );
-
-          const data = response.data;
-
-          setSubCategory(data);
-        } catch (error) {
-          console.error("Error fetching transaction data:", error);
-        }
+    const loadData = async () => {
+      setIsLoading(true); // Tampilkan loading
+      try {
+        await fetchData(); // Tunggu hingga pengambilan data selesai
+      } catch (error) {
+        console.error("Error fetching data:", error);
+      } finally {
+        setIsLoading(false); // Pastikan loading dihentikan
       }
     };
 
-    setIsLoading(false);
-
-    fetchData();
+    if (outletName) {
+      loadData();
+    }
   }, [outletName]);
 
   // haldle untuk memperbesar gambar
@@ -82,47 +92,40 @@ export default function subCategory() {
   };
 
   //handle untuk menghapus data
-  const handleRemove = (dataRemove) => {
+  const handleRemove = async (dataRemove) => {
     const savedToken = localStorage.getItem("token");
-    axios
-      .delete(
+
+    const handleError = async (error) => {
+      if (error.response?.status === 401) {
+        try {
+          const newToken = await getNewAccessToken();
+          localStorage.setItem("token", newToken); // Simpan token baru
+          await handleRemove(dataRemove); // Ulangi proses dengan token baru
+        } catch (err) {
+          console.error("Failed to refresh token:", err);
+          alert("Session Anda telah berakhir. Silakan login ulang.");
+          localStorage.clear();
+          router.push("/login");
+        }
+      } else {
+        console.error("Error deleting contact:", error);
+      }
+    };
+
+    try {
+      setIsLoading(true);
+      const response = await axios.delete(
         `${process.env.NEXT_PUBLIC_BASE_API_URL}/api/v1/subcategory/delete/${dataRemove}`,
-        {
-          headers: {
-            Authorization: "Bearer " + savedToken,
-          },
-        }
-      )
-      .then((response) => {
-        if (response.status === 200) {
-          setIsLoading(true);
-          const fetchData = async () => {
-            if (outletName) {
-              try {
-                // Mengambil data transaksi menggunakan axios dengan query params
-                const response = await axios.get(
-                  ` ${process.env.NEXT_PUBLIC_BASE_API_URL}/api/v1/subcategory/showcafename/${outletName}`
-                );
+        { headers: { Authorization: `Bearer ${savedToken}` } }
+      );
 
-                const data = response.data;
-
-                setSubCategory(data);
-              } catch (error) {
-                console.error("Error fetching transaction data:", error);
-              }
-            }
-          };
-
-          setIsLoading(false);
-
-          fetchData();
-        } else {
-          console.log(error);
-        }
-      })
-      .catch((error) => {
-        console.log(error);
-      });
+      if (response.status === 200) {
+        await fetchData();
+        setIsLoading(false);
+      }
+    } catch (error) {
+      await handleError(error);
+    }
   };
 
   return (

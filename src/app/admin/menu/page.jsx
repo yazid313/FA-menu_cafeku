@@ -8,6 +8,7 @@ import { jwtDecode } from "jwt-decode";
 import { useRouter } from "next/navigation";
 import Modal from "../modal";
 import AdminSkeleton from "../adminSkeleton/adminSkeleton";
+import { getNewAccessToken } from "../refreshToken";
 // import AdminSkeleton from "../adminSkeleton/adminSkeleton";
 
 export default function Menu() {
@@ -23,7 +24,7 @@ export default function Menu() {
   //use state untuk pagination
   const [rows, setRows] = useState(null);
   const [currentPage, setCurrentPage] = useState(1);
-  const [itemsPerPage] = useState(5); // 5 item per halaman
+  const [itemsPerPage] = useState(2); // 5 item per halaman
   const targetRef = useRef(null);
 
   // Menghitung indeks awal dan akhir untuk menampilkan nomber
@@ -96,8 +97,6 @@ export default function Menu() {
     setIsLoading(true);
     setCurrentPage(1);
     const fetchData = async () => {
-      outletName;
-
       if (outletName) {
         const params = {
           page: currentPage,
@@ -127,127 +126,86 @@ export default function Menu() {
     fetchData();
   };
 
-  // mengambil data lapangan by limit
+  // function mengambil data lapangan by limit
+  const fetchData = async () => {
+    const params = {
+      page: currentPage,
+      limit: itemsPerPage,
+      search: query,
+      outlet_name: outletName,
+    };
+    try {
+      // Mengambil data transaksi menggunakan axios dengan query params
+      const response = await axios.get(
+        `  ${process.env.NEXT_PUBLIC_BASE_API_URL}/api/v1/menu/show`,
+        {
+          params: params,
+        }
+      );
+
+      const data = response.data.menu;
+      setMenu(data);
+      setRows(response.data.totalItems);
+    } catch (error) {
+      console.error("Error fetching transaction data:", error);
+    }
+  };
+  // useEffect mengambil data lapangan by limit
   useEffect(() => {
-    if (query === "") {
-      setIsLoading(true);
-      const fetchData = async () => {
-        if (outletName) {
-          const params = {
-            page: currentPage,
-            limit: itemsPerPage,
-            search: query,
-            outlet_name: outletName,
-          };
-          try {
-            // Mengambil data transaksi menggunakan axios dengan query params
-            const response = await axios.get(
-              `  ${process.env.NEXT_PUBLIC_BASE_API_URL}/api/v1/menu/show`,
-              {
-                params: params,
-              }
-            );
+    const loadData = async () => {
+      setIsLoading(true); // Tampilkan loading
+      try {
+        await fetchData(); // Tunggu hingga pengambilan data selesai
+      } catch (error) {
+        console.error("Error fetching data:", error);
+      } finally {
+        setIsLoading(false); // Pastikan loading dihentikan
+      }
+    };
 
-            const data = response.data.menu;
-            setMenu(data);
-            setRows(response.data.totalItems);
-          } catch (error) {
-            console.error("Error fetching transaction data:", error);
-          }
-        }
-      };
-      setIsLoading(false);
-
-      fetchData();
-    } else {
-      setIsLoading(true);
-      const fetchData = async () => {
-        if (outletName) {
-          const params = {
-            page: currentPage,
-            limit: itemsPerPage,
-            search: query,
-            outlet_name: outletName,
-          };
-          try {
-            // Mengambil data transaksi menggunakan axios dengan query params
-            const response = await axios.get(
-              `  ${process.env.NEXT_PUBLIC_BASE_API_URL}/api/v1/menu/show`,
-              {
-                params: params,
-              }
-            );
-
-            const data = response.data.menu;
-            setMenu(data);
-            setRows(response.data.totalItems);
-          } catch (error) {
-            console.error("Error fetching transaction data:", error);
-          }
-        }
-      };
-      setIsLoading(false);
-
-      fetchData();
+    if (outletName) {
+      loadData();
     }
   }, [itemsPerPage, currentPage, outletName]);
 
   //handle untuk menghapus data
-  const handleRemove = (dataRemove) => {
+  const handleRemove = async (dataRemove) => {
     const savedToken = localStorage.getItem("token");
-    axios
-      .delete(
+
+    const handleError = async (error) => {
+      if (error.response?.status === 401) {
+        try {
+          const newToken = await getNewAccessToken();
+          localStorage.setItem("token", newToken); // Simpan token baru
+          await handleRemove(dataRemove); // Ulangi proses dengan token baru
+        } catch (err) {
+          console.error("Failed to refresh token:", err);
+          alert("Session Anda telah berakhir. Silakan login ulang.");
+          localStorage.clear();
+          router.push("/login");
+        }
+      } else {
+        console.error("Error deleting contact:", error);
+      }
+    };
+
+    try {
+      setIsLoading(true);
+      const response = await axios.delete(
         `${process.env.NEXT_PUBLIC_BASE_API_URL}/api/v1/menu/delete/${dataRemove}`,
-        {
-          headers: {
-            Authorization: "Bearer " + savedToken,
-          },
-        }
-      )
-      .then((response) => {
-        if (response.status === 200) {
-          setIsLoading(false);
-          const fetchData = async () => {
-            if (outletName) {
-              const params = {
-                page: currentPage,
-                limit: itemsPerPage,
-                search: query,
-                outlet_name: outletName,
-              };
-              try {
-                // Mengambil data transaksi menggunakan axios dengan query params
-                const response = await axios.get(
-                  `  ${process.env.NEXT_PUBLIC_BASE_API_URL}/api/v1/menu/show`,
-                  {
-                    headers: {
-                      Authorization: `Bearer ${savedToken}`,
-                    },
-                    params: params,
-                  }
-                );
+        { headers: { Authorization: `Bearer ${savedToken}` } }
+      );
 
-                const data = response.data.menu;
-                setMenu(data);
-                setRows(response.data.totalItems);
-              } catch (error) {
-                console.error("Error fetching transaction data:", error);
-              }
-            }
-          };
-          setIsLoading(false);
-
-          fetchData();
-        } else {
-          console.log(error);
-        }
-      })
-      .catch((error) => {
-        console.log(error);
-      });
+      if (response.status === 200) {
+        await fetchData();
+        setIsLoading(false);
+      }
+    } catch (error) {
+      await handleError(error);
+    }
   };
 
-  const handleUpdate = (dataUdate, boolean) => {
+  const handleUpdate2 = (dataUdate, boolean) => {
     const savedToken = localStorage.getItem("token");
 
     const best = {
@@ -302,6 +260,46 @@ export default function Menu() {
       .catch((error) => {
         console.log(error);
       });
+  };
+
+  const handleUpdate = async (dataUdate, boolean) => {
+    const savedToken = localStorage.getItem("token");
+    const best = {
+      best_seller: boolean,
+    };
+
+    const handleError = async (error) => {
+      if (error.response?.status === 401) {
+        try {
+          const newToken = await getNewAccessToken();
+          localStorage.setItem("token", newToken); // Simpan token baru
+          await handleUpdate(dataUdate, boolean); // Ulangi proses dengan token baru
+        } catch (err) {
+          console.error("Failed to refresh token:", err);
+          alert("Session Anda telah berakhir. Silakan login ulang.");
+          localStorage.clear();
+          router.push("/login");
+        }
+      } else {
+        console.error("Error deleting contact:", error);
+      }
+    };
+
+    try {
+      setIsLoading(true);
+      const response = await axios.put(
+        `${process.env.NEXT_PUBLIC_BASE_API_URL}/api/v1/menu/update/${dataUdate}`,
+        best,
+        { headers: { Authorization: `Bearer ${savedToken}` } }
+      );
+
+      if (response.status === 200) {
+        await fetchData();
+        setIsLoading(false);
+      }
+    } catch (error) {
+      await handleError(error);
+    }
   };
 
   // haldle untuk memperbesar gambar
